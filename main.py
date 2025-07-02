@@ -13,4 +13,4 @@ if st.button("Run Agent") and brief:
         else:
             output = marketing_agent(brief)
         st.markdown("---")
-        st.text_area("Result", output, height=400)
+        st.markdown(output, unsafe_allow_html=True)
