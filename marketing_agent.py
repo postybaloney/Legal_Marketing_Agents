@@ -651,9 +651,361 @@ class MarketingAgent:
         
         industry_keywords = industry_data.get('industry_keywords', []) if industry_data else []
         search_terms = ' '.join(industry_keywords) if industry_keywords else brief
+        primary_industry = industry_data.get('primary_industry', 'general') if industry_data else 'general'
         
         try:
             if self.serpapi_key:
                 # Industry-specific trend queries
                 trend_queries = [
-                    f"{search
+                    f"{search_terms} emerging trends 2024 2025 future outlook digital transformation",
+                    f"{primary_industry} industry trends technology adoption automation AI",
+                    f"{search_terms} regulatory changes compliance requirements government policy",
+                    f"{search_terms} consumer behavior shifts demographic trends millennial GenZ",
+                    f"{search_terms} sustainability ESG environmental social governance trends",
+                    f"{search_terms} economic outlook inflation interest rates recession recovery",
+                    f"{search_terms} supply chain disruption globalization reshoring trends",
+                    f"{search_terms} cybersecurity threats data privacy regulations",
+                    f"{search_terms} remote work hybrid workplace future of work trends",
+                    f"{search_terms} investment trends venture capital private equity funding"
+                ]
+                
+                for query in trend_queries:
+                    trend_data.extend(self._search_data_source(query, "Macro Trend Analysis"))
+                
+                # Add specialized consultancy trend reports
+                consultancy_trend_queries = [
+                    f"site:mckinsey.com {search_terms} trends report outlook 2024 2025",
+                    f"site:bcg.com {search_terms} industry transformation digital trends",
+                    f"site:deloitte.com {search_terms} tech trends future outlook",
+                    f"site:pwc.com {search_terms} global trends CEO survey outlook",
+                    f"site:accenture.com {search_terms} technology trends innovation"
+                ]
+                
+                for query in consultancy_trend_queries:
+                    trend_data.extend(self._search_data_source(query, "Consultancy Trend Reports"))
+                
+        except Exception as e:
+            trend_data.append({"error": f"Macro trend analysis failed: {str(e)}"})
+            
+        return trend_data
+    
+    def get_funding_and_investment_analysis(self, brief, industry_data=None):
+        """Analyze funding trends and investment patterns"""
+        funding_data = []
+        
+        industry_keywords = industry_data.get('industry_keywords', []) if industry_data else []
+        search_terms = ' '.join(industry_keywords) if industry_keywords else brief
+        
+        try:
+            if self.serpapi_key:
+                # Funding and investment queries
+                funding_queries = [
+                    f"{search_terms} venture capital funding Series A B C investment rounds",
+                    f"{search_terms} private equity buyout M&A acquisition deals",
+                    f"{search_terms} IPO initial public offering SPAC listing",
+                    f"{search_terms} investment trends valuation multiples funding rounds",
+                    f"{search_terms} startup funding unicorn decacorn valuations",
+                    f"{search_terms} corporate venture capital strategic investments",
+                    f"{search_terms} angel investment seed funding early stage",
+                    f"{search_terms} growth equity late stage funding expansion"
+                ]
+                
+                for query in funding_queries:
+                    funding_data.extend(self._search_data_source(query, "Funding Analysis"))
+                
+                # Add CB Insights and PitchBook data
+                specialized_funding_queries = [
+                    f"site:cbinsights.com {search_terms} funding report venture capital",
+                    f"site:pitchbook.com {search_terms} private equity venture capital data",
+                    f"site:crunchbase.com {search_terms} startup funding investment rounds"
+                ]
+                
+                for query in specialized_funding_queries:
+                    funding_data.extend(self._search_data_source(query, "Investment Data Providers"))
+                
+        except Exception as e:
+            funding_data.append({"error": f"Funding analysis failed: {str(e)}"})
+            
+        return funding_data
+    
+    def get_regulatory_and_compliance_analysis(self, brief, industry_data=None):
+        """Analyze regulatory environment and compliance requirements"""
+        regulatory_data = []
+        
+        industry_keywords = industry_data.get('industry_keywords', []) if industry_data else []
+        search_terms = ' '.join(industry_keywords) if industry_keywords else brief
+        primary_industry = industry_data.get('primary_industry', 'general') if industry_data else 'general'
+        
+        try:
+            if self.serpapi_key:
+                # Regulatory analysis queries
+                regulatory_queries = [
+                    f"{search_terms} regulatory requirements compliance standards",
+                    f"{primary_industry} industry regulations government oversight",
+                    f"{search_terms} data privacy GDPR CCPA compliance requirements",
+                    f"{search_terms} FDA approval regulatory pathway clinical trials",
+                    f"{search_terms} SEC regulations financial compliance reporting",
+                    f"{search_terms} environmental regulations sustainability compliance",
+                    f"{search_terms} cybersecurity regulations data protection laws",
+                    f"{search_terms} international trade regulations export controls"
+                ]
+                
+                for query in regulatory_queries:
+                    regulatory_data.extend(self._search_data_source(query, "Regulatory Analysis"))
+                
+        except Exception as e:
+            regulatory_data.append({"error": f"Regulatory analysis failed: {str(e)}"})
+            
+        return regulatory_data
+    
+    def generate_comprehensive_report(self, brief):
+        """Generate a comprehensive marketing intelligence report"""
+        print("🚀 Starting comprehensive marketing intelligence analysis...")
+        
+        # Gather all data sources
+        market_data, industry_data = self.get_tam_sam_som_analysis(brief)
+        competitive_data = self.get_competitive_intelligence(brief, industry_data)
+        trend_data = self.get_macro_trend_analysis(brief, industry_data)
+        funding_data = self.get_funding_and_investment_analysis(brief, industry_data)
+        regulatory_data = self.get_regulatory_and_compliance_analysis(brief, industry_data)
+        
+        # Compile all research data
+        all_research_data = {
+            "market_analysis": market_data,
+            "competitive_intelligence": competitive_data,
+            "macro_trends": trend_data,
+            "funding_analysis": funding_data,
+            "regulatory_analysis": regulatory_data,
+            "industry_classification": industry_data
+        }
+        if brief.find("- Output Format: Detailed Report") != -1:
+            # Generate comprehensive analysis
+            comprehensive_analysis_prompt = f"""
+            You are a senior strategy consultant preparing a comprehensive marketing intelligence report.
+            
+            Business Brief: {brief}
+            
+            Industry Classification: {json.dumps(industry_data, indent=2)}
+            
+            Research Data Summary:
+            - Market Analysis: {len(market_data)} sources
+            - Competitive Intelligence: {len(competitive_data)} sources  
+            - Macro Trends: {len(trend_data)} sources
+            - Funding Analysis: {len(funding_data)} sources
+            - Regulatory Analysis: {len(regulatory_data)} sources
+            
+            Based on this comprehensive research, provide a strategic marketing intelligence report with the following sections:
+            
+            # EXECUTIVE SUMMARY
+            - Key strategic insights and recommendations
+            - Critical success factors and market opportunities
+            - Top 3 strategic priorities
+            
+            # MARKET OPPORTUNITY ANALYSIS
+            - Total Addressable Market (TAM) sizing and growth projections
+            - Serviceable Addressable Market (SAM) analysis
+            - Serviceable Obtainable Market (SOM) opportunity
+            - Market segment analysis and customer personas
+            - Revenue potential and business model validation
+            
+            # COMPETITIVE LANDSCAPE
+            - Competitive positioning matrix
+            - Direct and indirect competitor analysis
+            - Competitive advantages and differentiation opportunities
+            - Market share analysis and competitive threats
+            - Strategic partnerships and ecosystem analysis
+            
+            # MARKET DYNAMICS AND TRENDS
+            - Industry growth drivers and headwinds
+            - Technology disruption and innovation trends
+            - Regulatory and compliance landscape
+            - Consumer behavior and demographic shifts
+            - Economic and macro-environmental factors
+            
+            # INVESTMENT AND FUNDING LANDSCAPE
+            - Venture capital and private equity activity
+            - Valuation benchmarks and funding trends
+            - Strategic investor interest and corporate venture activity
+            - M&A activity and consolidation trends
+            - IPO and exit opportunities
+            
+            # STRATEGIC RECOMMENDATIONS
+            - Go-to-market strategy recommendations
+            - Product-market fit validation approach
+            - Partnership and alliance opportunities
+            - Investment and funding strategy
+            - Risk mitigation and contingency planning
+            
+            # FINANCIAL PROJECTIONS AND BENCHMARKS
+            - Revenue growth projections and scenarios
+            - Unit economics and profitability analysis
+            - Key performance indicators and benchmarks
+            - Financial modeling assumptions and sensitivities
+            
+            Use specific data points, market sizing numbers, and quantitative insights from the research.
+            Provide actionable recommendations with clear rationale.
+            Focus on strategic decision-making and competitive advantage.
+            """
+            
+            comprehensive_report = self.call_openai_agent(comprehensive_analysis_prompt, temperature=0.2)
+            executive_summary = 'NA'
+        else:     
+            # Generate executive summary
+            executive_summary_prompt = f"""
+            Based on the comprehensive marketing intelligence analysis, create a concise executive summary 
+            that a C-level executive could read in 3-5 minutes:
+            
+            Business Brief: {brief}
+            
+            Focus on:
+            1. Market opportunity size and growth potential
+            2. Competitive positioning and differentiation
+            3. Key success factors and strategic priorities
+            4. Investment requirements and expected returns
+            5. Major risks and mitigation strategies
+            
+            Provide specific numbers, market sizing, and quantitative insights.
+            Make clear recommendations with supporting rationale.
+            """
+            
+            executive_summary = self.call_openai_agent(executive_summary_prompt, temperature=0.1)
+            comprehensive_report = 'NA'
+            
+        # Generate data source summary
+        data_source_summary = self._generate_data_source_summary(all_research_data)
+        
+        # Compile final report
+        final_report = {
+            "executive_summary": executive_summary,
+            "comprehensive_analysis": comprehensive_report,
+            "data_source_summary": data_source_summary,
+            "research_metadata": {
+                "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "industry_classification": industry_data,
+                "data_sources_analyzed": {
+                    "market_analysis": len(market_data),
+                    "competitive_intelligence": len(competitive_data),
+                    "macro_trends": len(trend_data),
+                    "funding_analysis": len(funding_data),
+                    "regulatory_analysis": len(regulatory_data)
+                },
+                "total_sources": len(market_data) + len(competitive_data) + len(trend_data) + len(funding_data) + len(regulatory_data)
+            }
+        }
+        
+        return final_report
+    
+    def _generate_data_source_summary(self, research_data):
+        """Generate a summary of data sources used in the analysis"""
+        source_summary = {
+            "high_credibility_sources": [],
+            "industry_specific_sources": [],
+            "quantitative_data_sources": [],
+            "recent_sources": [],
+            "sec_filing_sources": []
+        }
+        
+        # Analyze all data sources
+        for category, data_list in research_data.items():
+            if category == "industry_classification":
+                continue
+                
+            for item in data_list:
+                if isinstance(item, dict) and "source" in item:
+                    source_info = {
+                        "source": item.get("source", "Unknown"),
+                        "category": category,
+                        "relevance_score": item.get("relevance_score", 0),
+                        "data_quality": item.get("data_quality", "Unknown")
+                    }
+                    
+                    # Categorize sources
+                    if item.get("relevance_score", 0) >= 8:
+                        source_summary["high_credibility_sources"].append(source_info)
+                    
+                    if "SEC" in item.get("source", ""):
+                        source_summary["sec_filing_sources"].append(source_info)
+                    
+                    if item.get("data_quality") == "High":
+                        source_summary["quantitative_data_sources"].append(source_info)
+                    
+                    if item.get("publication_indicators", {}).get("has_date", False):
+                        source_summary["recent_sources"].append(source_info)
+        
+        return source_summary
+    
+    def save_report(self, report, filename=None):
+        """Save the comprehensive report to a JSON file"""
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"marketing_intelligence_report_{timestamp}.json"
+        
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(report, f, indent=2, ensure_ascii=False)
+            print(f"📊 Report saved to: {filename}")
+            return filename
+        except Exception as e:
+            print(f"❌ Error saving report: {str(e)}")
+            return None
+        
+def marketing_agent(brief: str):
+    agent = MarketingAgent()
+    report_dict = agent.generate_comprehensive_report(brief)
+    if brief.find("- Output Format: Detailed Report") != -1:
+        formatted_report = f"""{report_dict.get('comprehensive_analysis', 'Comprehensive analysis not available')}"""
+    else:
+        formatted_report = f"""{report_dict.get('executive_summary', 'Executive summary not available')}"""
+    formatted_report += f"""
+
+        **Analysis Date:** {report_dict.get('research_metadata', {}).get('analysis_date', 'Not available')}
+
+        **Industry Classification:** {report_dict.get('research_metadata', {}).get('industry_classification', {}).get('primary_industry', 'Not specified')}
+
+        **Total Sources Analyzed:** {report_dict.get('research_metadata', {}).get('total_sources', 0)}
+
+        ### Data Sources Breakdown:
+        """
+    
+    # Add data sources breakdown
+    data_sources = report_dict.get('research_metadata', {}).get('data_sources_analyzed', {})
+    for source_type, count in data_sources.items():
+        formatted_report += f"- **{source_type.replace('_', ' ').title()}:** {count} sources\n"
+    
+    # Add data source summary if available
+    data_source_summary = report_dict.get('data_source_summary', {})
+    if data_source_summary:
+        formatted_report += f"\n### 🔍 DATA SOURCE QUALITY ASSESSMENT\n"
+        
+        high_cred_sources = len(data_source_summary.get('high_credibility_sources', []))
+        sec_sources = len(data_source_summary.get('sec_filing_sources', []))
+        quant_sources = len(data_source_summary.get('quantitative_data_sources', []))
+        recent_sources = len(data_source_summary.get('recent_sources', []))
+        
+        formatted_report += f"- **High Credibility Sources:** {high_cred_sources}\n"
+        formatted_report += f"- **SEC Filing Sources:** {sec_sources}\n"
+        formatted_report += f"- **Quantitative Data Sources:** {quant_sources}\n"
+        formatted_report += f"- **Recent Sources (2024-2025):** {recent_sources}\n"
+    
+    formatted_report += f"""
+
+            This comprehensive analysis leverages {report_dict.get('research_metadata', {}).get('total_sources', 0)} data sources including:
+            - Industry-specific consultancy reports
+            - SEC filing analysis from relevant public companies
+            - Competitive intelligence and market research
+            - Macro trend analysis and regulatory insights
+            - Investment and funding landscape analysis
+
+            **Recommended Next Steps:**
+            1. Review the executive summary for immediate strategic priorities
+            2. Analyze the competitive positioning recommendations
+            3. Evaluate the market sizing and revenue opportunity
+            4. Consider the regulatory and compliance requirements
+            5. Develop implementation roadmap based on strategic recommendations
+
+            ---
+
+            *This report was generated using advanced AI-powered market research and analysis. The insights are based on publicly available data and should be validated with additional primary research as needed.*
+            """
+    return formatted_report
+

@@ -121,7 +121,8 @@ def main():
         # Output format
         output_format = st.selectbox(
             "Output Format",
-            ["Detailed Report", "Executive Summary", "Action Items"],
+            ["Detailed Report", "Executive Summary"],
+            # Action Items can be later added
             help="Choose how you want the results formatted"
         )
         
@@ -223,7 +224,7 @@ def main():
                 for i, stage in enumerate(stages):
                     progress_text.text(stage)
                     progress_bar.progress((i + 1) / len(stages))
-                    time.sleep(30)
+                    time.sleep(43)
                 
                 # Run the appropriate agent
                 try:
