@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 import json
 from datetime import datetime
 import time
+import re
+from typing import Dict, List, Tuple
 
 load_dotenv()
 
@@ -13,6 +15,71 @@ class MarketingAgent:
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.serpapi_key = os.getenv("SERPAPI_KEY")
         self.data_sources = []
+        
+        # Industry-specific consultancy mapping
+        self.industry_consultancies = {
+            "technology": ["Gartner", "Forrester", "IDC", "McKinsey Digital", "Accenture", "Deloitte Tech"],
+            "healthcare": ["IQVIA", "Frost & Sullivan", "Grand View Research", "McKinsey Health", "BCG Health"],
+            "financial_services": ["Oliver Wyman", "Aite Group", "Celent", "McKinsey Financial", "PwC Financial"],
+            "retail": ["Retail Industry Leaders", "NRF", "Euromonitor", "Mintel", "BCG Retail"],
+            "manufacturing": ["Frost & Sullivan", "Roland Berger", "Strategy&", "McKinsey Operations"],
+            "energy": ["Wood Mackenzie", "IHS Markit", "S&P Global", "McKinsey Energy", "BCG Energy"],
+            "automotive": ["IHS Automotive", "Strategy&", "AlixPartners", "McKinsey Automotive"],
+            "aerospace": ["Teal Group", "Frost & Sullivan", "Strategy&", "Roland Berger"],
+            "real_estate": ["CBRE Research", "JLL Research", "PwC Real Estate", "McKinsey Capital Projects"],
+            "telecommunications": ["Analysys Mason", "Ovum", "Frost & Sullivan", "McKinsey TMT"],
+            "media": ["PwC Entertainment", "Deloitte TMT", "Strategy& Media", "McKinsey Media"],
+            "chemicals": ["IHS Chemical", "Frost & Sullivan", "Strategy&", "McKinsey Chemicals"],
+            "agriculture": ["Rabobank", "McKinsey Agriculture", "Frost & Sullivan", "Strategy&"],
+            "logistics": ["Armstrong & Associates", "Frost & Sullivan", "Strategy&", "McKinsey Travel Transport"],
+            "education": ["HolonIQ", "Frost & Sullivan", "Tyton Partners", "McKinsey Education"],
+            "cybersecurity": ["Gartner Security", "Forrester Security", "IDC Security", "Frost & Sullivan"],
+            "artificial_intelligence": ["Gartner AI", "Forrester AI", "IDC AI", "McKinsey AI", "BCG AI"],
+            "fintech": ["CB Insights", "Frost & Sullivan", "McKinsey Fintech", "BCG Fintech"],
+            "biotechnology": ["Frost & Sullivan", "Grand View Research", "McKinsey Pharma", "BCG Biopharma"],
+            "e_commerce": ["Forrester", "Gartner", "McKinsey Retail", "BCG Digital Commerce"]
+        }
+        
+        # SEC EDGAR API base URL
+        self.sec_base_url = "https://data.sec.gov"
+        
+        # Enhanced consultancy site mapping for better search targeting
+        self.consultancy_sites = {
+            "McKinsey": "mckinsey.com",
+            "BCG": "bcg.com",
+            "Bain": "bain.com",
+            "Deloitte": "deloitte.com",
+            "PwC": "pwc.com",
+            "Accenture": "accenture.com",
+            "Gartner": "gartner.com",
+            "Forrester": "forrester.com",
+            "IDC": "idc.com",
+            "Frost & Sullivan": "frost.com",
+            "Grand View Research": "grandviewresearch.com",
+            "Oliver Wyman": "oliverwyman.com",
+            "Strategy&": "strategyand.pwc.com",
+            "Roland Berger": "rolandberger.com",
+            "IQVIA": "iqvia.com",
+            "Wood Mackenzie": "woodmac.com",
+            "IHS Markit": "ihsmarkit.com",
+            "S&P Global": "spglobal.com",
+            "CB Insights": "cbinsights.com",
+            "Euromonitor": "euromonitor.com",
+            "Mintel": "mintel.com",
+            "NRF": "nrf.com",
+            "CBRE Research": "cbre.com",
+            "JLL Research": "jll.com",
+            "Analysys Mason": "analysysmason.com",
+            "Ovum": "ovum.com",
+            "Teal Group": "tealgroup.com",
+            "AlixPartners": "alixpartners.com",
+            "Armstrong & Associates": "3plogistics.com",
+            "HolonIQ": "holoniq.com",
+            "Tyton Partners": "tytonpartners.com",
+            "Aite Group": "aitegroup.com",
+            "Celent": "celent.com",
+            "Rabobank": "rabobank.com"
+        }
         
     def call_openai_agent(self, prompt, temperature=0.2, model="gpt-4o"):
         """Enhanced OpenAI call optimized for strategic analysis"""
@@ -26,51 +93,389 @@ class MarketingAgent:
             return response.choices[0].message.content
         except Exception as e:
             return f"OpenAI API Error: {str(e)}"
+    
+    def identify_industry_and_consultancies(self, brief):
+        """Identify industry and select relevant consultancies"""
+        industry_prompt = f"""
+        Analyze this business brief and identify the primary industry: "{brief}"
         
+        Return your response in this exact JSON format:
+        {{
+            "primary_industry": "one of: technology, healthcare, financial_services, retail, manufacturing, energy, automotive, aerospace, real_estate, telecommunications, media, chemicals, agriculture, logistics, education, cybersecurity, artificial_intelligence, fintech, biotechnology, e_commerce",
+            "secondary_industries": ["list of 1-2 secondary industries"],
+            "industry_keywords": ["5-10 specific industry keywords for research"],
+            "naics_codes": ["relevant NAICS codes if identifiable"],
+            "market_research_focus": ["3-5 specific market research topics to focus on"]
+        }}
+        """
+        
+        try:
+            response = self.call_openai_agent(industry_prompt, temperature=0.1)
+            # Extract JSON from response
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                industry_data = json.loads(json_match.group())
+                return industry_data
+            else:
+                # Fallback
+                return {
+                    "primary_industry": "technology",
+                    "secondary_industries": [],
+                    "industry_keywords": ["market", "analysis", "research"],
+                    "naics_codes": [],
+                    "market_research_focus": ["market size", "competitive landscape", "growth trends"]
+                }
+        except Exception as e:
+            print(f"Industry identification error: {e}")
+            return {
+                "primary_industry": "technology",
+                "secondary_industries": [],
+                "industry_keywords": ["market", "analysis", "research"],
+                "naics_codes": [],
+                "market_research_focus": ["market size", "competitive landscape", "growth trends"]
+            }
+    
+    def get_industry_specific_consultancies(self, industry_data):
+        """Get consultancies specific to the identified industry"""
+        primary_industry = industry_data.get("primary_industry", "technology")
+        secondary_industries = industry_data.get("secondary_industries", [])
+        
+        consultancies = set()
+        
+        # Add primary industry consultancies
+        if primary_industry in self.industry_consultancies:
+            consultancies.update(self.industry_consultancies[primary_industry])
+        
+        # Add secondary industry consultancies
+        for secondary in secondary_industries:
+            if secondary in self.industry_consultancies:
+                consultancies.update(self.industry_consultancies[secondary][:3])  # Top 3 from secondary
+        
+        # Always include top-tier general consultancies
+        consultancies.update(["McKinsey", "BCG", "Bain", "Deloitte", "PwC", "Accenture"])
+        
+        return list(consultancies)
+    
+    def get_relevant_public_companies(self, brief, industry_data):
+        """Identify relevant public companies for SEC filing analysis"""
+        company_prompt = f"""
+        Based on this business brief: "{brief}"
+        And industry classification: {json.dumps(industry_data)}
+        
+        Identify 12-15 relevant public companies that would be:
+        1. Direct competitors (same business model/market)
+        2. Companies in the same industry vertical
+        3. Companies with similar customer segments
+        4. Technology/service providers in the ecosystem
+        5. Potential partners or acquisition targets
+        
+        Return company names and ticker symbols in this format:
+        [
+            {{"company": "Company Name", "ticker": "SYMBOL", "relevance": "direct_competitor|industry_peer|similar_model|strategic_partner|ecosystem_player", "market_cap_tier": "large_cap|mid_cap|small_cap"}},
+            ...
+        ]
+        
+        Focus on companies that would have meaningful market data, competitive intelligence, 
+        and industry insights in their 10-K/10-Q filings.
+        """
+        
+        try:
+            response = self.call_openai_agent(company_prompt, temperature=0.1)
+            # Extract JSON array from response
+            json_match = re.search(r'\[.*\]', response, re.DOTALL)
+            if json_match:
+                companies = json.loads(json_match.group())
+                return companies
+            else:
+                return []
+        except Exception as e:
+            print(f"Company identification error: {e}")
+            return []
+    
+    def search_sec_filings(self, companies, industry_keywords):
+        """Enhanced SEC filing search with better error handling and data extraction"""
+        sec_data = []
+        
+        # Set proper headers for SEC API
+        headers = {
+            'User-Agent': 'MarketingAgent/1.0 (contact@yourcompany.com)',
+            'Accept-Encoding': 'gzip, deflate',
+            'Host': 'data.sec.gov'
+        }
+        
+        for company in companies[:10]:  # Limit to top 10 companies
+            ticker = company.get('ticker', '').upper()
+            company_name = company.get('company', '')
+            
+            try:
+                # First, try to get company information by ticker
+                company_tickers_url = f"{self.sec_base_url}/files/company_tickers.json"
+                tickers_response = requests.get(company_tickers_url, headers=headers)
+                
+                if tickers_response.status_code == 200:
+                    tickers_data = tickers_response.json()
+                    cik = None
+                    
+                    # Find CIK for the ticker
+                    for key, value in tickers_data.items():
+                        if value.get('ticker') == ticker:
+                            cik = str(value.get('cik_str')).zfill(10)
+                            break
+                    
+                    if cik:
+                        # Get company submissions
+                        submissions_url = f"{self.sec_base_url}/submissions/CIK{cik}.json"
+                        submissions_response = requests.get(submissions_url, headers=headers)
+                        
+                        if submissions_response.status_code == 200:
+                            filing_data = submissions_response.json()
+                            
+                            # Get recent 10-K and 10-Q filings
+                            recent_filings = []
+                            forms = filing_data.get('filings', {}).get('recent', {})
+                            
+                            if forms:
+                                form_list = forms.get('form', [])
+                                filing_dates = forms.get('filingDate', [])
+                                accession_numbers = forms.get('accessionNumber', [])
+                                primary_docs = forms.get('primaryDocument', [])
+                                
+                                for i, form in enumerate(form_list):
+                                    if form in ['10-K', '10-Q'] and len(recent_filings) < 4:
+                                        filing_info = {
+                                            'form': form,
+                                            'filingDate': filing_dates[i] if i < len(filing_dates) else 'Unknown',
+                                            'accessionNumber': accession_numbers[i] if i < len(accession_numbers) else 'Unknown',
+                                            'primaryDocument': primary_docs[i] if i < len(primary_docs) else 'Unknown'
+                                        }
+                                        recent_filings.append(filing_info)
+                            
+                            sec_data.append({
+                                'company': company_name,
+                                'ticker': ticker,
+                                'cik': cik,
+                                'recent_filings': recent_filings,
+                                'sic': filing_data.get('sic', 'Unknown'),
+                                'sicDescription': filing_data.get('sicDescription', 'Unknown'),
+                                'industry': filing_data.get('sicDescription', 'Unknown'),
+                                'relevance': company.get('relevance', 'unknown'),
+                                'market_cap_tier': company.get('market_cap_tier', 'unknown'),
+                                'business_description': filing_data.get('description', 'No description available')
+                            })
+                
+                # Rate limiting to respect SEC API limits
+                time.sleep(0.1)
+                
+            except Exception as e:
+                print(f"SEC filing search error for {ticker}: {e}")
+                continue
+        
+        return sec_data
+    
+    def analyze_sec_filing_content(self, sec_data, industry_keywords, brief):
+        """Enhanced SEC filing analysis with market intelligence extraction"""
+        market_insights = []
+        
+        for company_data in sec_data:
+            company = company_data.get('company', '')
+            ticker = company_data.get('ticker', '')
+            business_desc = company_data.get('business_description', '')
+            
+            # Analyze filing metadata and extract insights
+            filing_analysis = {
+                'company': company,
+                'ticker': ticker,
+                'market_insights': [],
+                'competitive_intelligence': [],
+                'financial_benchmarks': [],
+                'risk_factors': [],
+                'growth_strategies': [],
+                'market_size_references': []
+            }
+            
+            # Create comprehensive analysis of available data
+            recent_filings = company_data.get('recent_filings', [])
+            if recent_filings:
+                filing_summary = f"SEC Filing Analysis for {company} ({ticker}):\n"
+                filing_summary += f"Industry: {company_data.get('sicDescription', 'Unknown')}\n"
+                filing_summary += f"Business Description: {business_desc[:500]}...\n"
+                filing_summary += f"Recent Filings:\n"
+                
+                for filing in recent_filings:
+                    filing_summary += f"- {filing['form']} filed on {filing['filingDate']}\n"
+                
+                # Market intelligence extraction prompt
+                market_intelligence_prompt = f"""
+                As a senior equity research analyst, analyze this SEC filing information for {company} ({ticker}):
+                
+                {filing_summary}
+                
+                Target Business Context: {brief}
+                Industry Keywords: {', '.join(industry_keywords)}
+                Company Relevance: {company_data.get('relevance', 'unknown')}
+                Market Cap Tier: {company_data.get('market_cap_tier', 'unknown')}
+                
+                Extract specific market intelligence that would be valuable for competitive analysis:
+                
+                1. **Market Size and Opportunity References**
+                   - TAM/SAM mentions or market sizing data
+                   - Growth rate projections and market forecasts
+                   - Market share positions and competitive positioning
+                
+                2. **Competitive Landscape Intelligence**
+                   - Direct and indirect competitors mentioned
+                   - Competitive advantages and differentiation factors
+                   - Market consolidation trends and M&A activity
+                
+                3. **Financial Performance Benchmarks**
+                   - Revenue growth rates and margin trends
+                   - R&D investment levels and innovation focus
+                   - Customer acquisition and retention metrics
+                
+                4. **Strategic Initiatives and Investments**
+                   - Technology investments and digital transformation
+                   - Geographic expansion and market entry strategies
+                   - Partnership and acquisition strategies
+                
+                5. **Risk Factors and Market Challenges**
+                   - Industry-specific risks and regulatory challenges
+                   - Competitive threats and market disruptions
+                   - Economic and market condition impacts
+                
+                6. **Customer and Market Trends**
+                   - Customer segment analysis and behavior trends
+                   - Market demand drivers and adoption patterns
+                   - Pricing trends and customer willingness to pay
+                
+                Provide specific, actionable insights that would inform strategic decision-making.
+                Focus on quantitative data and specific market intelligence.
+                """
+                
+                market_intelligence = self.call_openai_agent(market_intelligence_prompt, temperature=0.2)
+                
+                # Additional competitive positioning analysis
+                competitive_positioning_prompt = f"""
+                Based on the SEC filing data for {company} ({ticker}), provide a competitive positioning analysis:
+                
+                {filing_summary}
+                
+                Focus on:
+                1. Competitive moats and sustainable advantages
+                2. Market positioning vs. industry peers
+                3. Strategic vulnerabilities and competitive threats
+                4. Innovation and technology leadership indicators
+                5. Financial strength and resource advantages
+                
+                Provide 3-5 key strategic insights that would be valuable for competitive analysis.
+                """
+                
+                competitive_positioning = self.call_openai_agent(competitive_positioning_prompt, temperature=0.2)
+                
+                filing_analysis['market_insights'] = market_intelligence
+                filing_analysis['competitive_intelligence'] = competitive_positioning
+                
+                # Extract financial benchmarks
+                financial_benchmark_prompt = f"""
+                Extract key financial benchmarks from {company} ({ticker}) SEC filing data:
+                
+                {filing_summary}
+                
+                Provide specific metrics that would be useful for financial modeling:
+                - Revenue growth rates (historical and projected)
+                - Gross margin trends and drivers
+                - Operating margin and scalability indicators
+                - R&D spending as % of revenue
+                - Sales & marketing efficiency metrics
+                - Customer acquisition cost trends
+                - Working capital and cash flow patterns
+                
+                Focus on quantitative metrics that can be used for benchmarking.
+                """
+                
+                financial_benchmarks = self.call_openai_agent(financial_benchmark_prompt, temperature=0.1)
+                filing_analysis['financial_benchmarks'] = financial_benchmarks
+            
+            market_insights.append(filing_analysis)
+        
+        return market_insights
+    
     def get_tam_sam_som_analysis(self, brief):
-        """Total Addressable Market, Serviceable Addressable Market, Serviceable Obtainable Market analysis"""
+        """Enhanced TAM/SAM/SOM analysis with industry-specific consultancies and SEC data"""
+        print("🔍 Identifying industry and relevant consultancies...")
+        
+        # Identify industry and get specific consultancies
+        industry_data = self.identify_industry_and_consultancies(brief)
+        consultancies = self.get_industry_specific_consultancies(industry_data)
+        
+        print(f"📊 Focusing on {industry_data['primary_industry']} industry with {len(consultancies)} specialized consultancies...")
+        
         market_data = []
         
-        # Industry classification and sizing
-        industry_query = self.call_openai_agent(
-            f"Classify this business into specific industry categories with NAICS codes: {brief}. "
-            f"Provide primary and secondary industry classifications."
-        )
-        
-        # Market size research using multiple sources
+        # Industry-specific market research from consultancies
         try:
             if self.serpapi_key:
-                # Statista research
-                statista_query = f"site:statista.com market size {brief} 2024 2025"
-                market_data.extend(self._search_data_source(statista_query, "Statista"))
+                # Search each relevant consultancy with targeted queries
+                for consultancy in consultancies:
+                    # Get consultancy website domain
+                    site_domain = self.consultancy_sites.get(consultancy, consultancy.lower().replace(' ', '').replace('&', '') + '.com')
+                    
+                    # Create targeted search queries for each consultancy
+                    search_terms = ' '.join(industry_data.get('industry_keywords', []))
+                    market_focus_terms = ' '.join(industry_data.get('market_research_focus', []))
+                    
+                    # Multiple targeted queries per consultancy
+                    consultancy_queries = [
+                        f"site:{site_domain} {search_terms} market size TAM SAM billion 2024 2025",
+                        f"site:{site_domain} {search_terms} industry analysis market forecast CAGR",
+                        f"site:{site_domain} {market_focus_terms} competitive landscape market share",
+                        f"site:{site_domain} {search_terms} market opportunity addressable market revenue"
+                    ]
+                    
+                    for query in consultancy_queries:
+                        consultancy_data = self._search_data_source(query, consultancy)
+                        market_data.extend(consultancy_data[:2])  # Top 2 results per query
                 
-                # IBISWorld research
-                ibis_query = f"site:ibisworld.com industry report {brief}"
-                market_data.extend(self._search_data_source(ibis_query, "IBISWorld"))
+                # Add specialized industry research with broader sources
+                broader_industry_queries = [
+                    f"{' '.join(industry_data.get('industry_keywords', []))} market size billion TAM SAM SOM 2024 2025",
+                    f"{industry_data.get('primary_industry')} industry analysis market forecast growth rate",
+                    f"{' '.join(industry_data.get('market_research_focus', []))} market research report industry outlook"
+                ]
                 
-                # McKinsey insights
-                mckinsey_query = f"site:mckinsey.com {brief} market trends analysis"
-                market_data.extend(self._search_data_source(mckinsey_query, "McKinsey"))
-                
-                # BCG insights
-                bcg_query = f"site:bcg.com {brief} industry analysis"
-                market_data.extend(self._search_data_source(bcg_query, "BCG"))
-                
-                # Bain insights
-                bain_query = f"site:bain.com {brief} market research"
-                market_data.extend(self._search_data_source(bain_query, "Bain"))
-                
-                # Financial reports and analyst research
-                analyst_query = f"{brief} market size forecast analyst report Gartner Forrester"
-                market_data.extend(self._search_data_source(analyst_query, "Analyst Reports"))
+                for query in broader_industry_queries:
+                    market_data.extend(self._search_data_source(query, "Industry Research"))
                 
         except Exception as e:
             market_data.append({"error": f"Market research failed: {str(e)}"})
-            
-        return market_data
+        
+        # SEC filing analysis for market intelligence
+        print("📋 Analyzing SEC filings for market intelligence...")
+        try:
+            relevant_companies = self.get_relevant_public_companies(brief, industry_data)
+            if relevant_companies:
+                sec_data = self.search_sec_filings(relevant_companies, industry_data.get('industry_keywords', []))
+                sec_insights = self.analyze_sec_filing_content(sec_data, industry_data.get('industry_keywords', []), brief)
+                
+                # Add SEC insights to market data
+                for insight in sec_insights:
+                    market_data.append({
+                        "source": "SEC Filings Analysis",
+                        "company": insight['company'],
+                        "ticker": insight['ticker'],
+                        "market_insights": insight['market_insights'],
+                        "competitive_intelligence": insight['competitive_intelligence'],
+                        "financial_benchmarks": insight['financial_benchmarks'],
+                        "relevance_score": 9,  # High relevance for SEC data
+                        "data_type": "Primary Financial Data",
+                        "analysis_depth": "Comprehensive"
+                    })
+        except Exception as e:
+            market_data.append({"error": f"SEC analysis failed: {str(e)}"})
+        
+        return market_data, industry_data
     
     def _search_data_source(self, query, source_type):
-        """Helper function to search specific data sources"""
+        """Enhanced helper function to search specific data sources"""
         results = []
         try:
             url = "https://serpapi.com/search"
@@ -78,434 +483,177 @@ class MarketingAgent:
                 "engine": "google",
                 "q": query,
                 "api_key": self.serpapi_key,
-                "num": 5
+                "num": 6,
+                "gl": "us",
+                "hl": "en"
             }
+            
             response = requests.get(url, params=params)
             if response.status_code == 200:
                 data = response.json()
+                
                 for item in data.get("organic_results", []):
+                    snippet = item.get('snippet', '')
+                    title = item.get('title', 'Unnamed Report')
+                    
+                    # Enhanced relevance scoring
+                    relevance_score = self._calculate_relevance(snippet, source_type, title)
+                    
+                    if relevance_score > 3:  # Only include high-relevance results
+                        results.append({
+                            "source": source_type,
+                            "title": title,
+                            "url": item.get('link', ''),
+                            "snippet": snippet,
+                            "relevance_score": relevance_score,
+                            "publication_indicators": self._extract_publication_indicators(snippet),
+                            "data_quality": self._assess_data_quality(snippet, source_type)
+                        })
+                
+                # Also check for featured snippets and knowledge panels
+                if "answer_box" in data:
+                    answer_box = data["answer_box"]
                     results.append({
-                        "source": source_type,
-                        "title": item.get('title', 'Unnamed Report'),
-                        "url": item.get('link', ''),
-                        "snippet": item.get('snippet', ''),
-                        "relevance_score": self._calculate_relevance(item.get('snippet', ''))
+                        "source": f"{source_type} (Featured)",
+                        "title": answer_box.get("title", "Featured Answer"),
+                        "url": answer_box.get("link", ""),
+                        "snippet": answer_box.get("snippet", ""),
+                        "relevance_score": 10,
+                        "data_type": "Featured Answer",
+                        "data_quality": "High"
                     })
+                
         except Exception as e:
             results.append({"error": f"{source_type} search failed: {str(e)}"})
+            
         return results
 
-    def _calculate_relevance(self, snippet):
-        """Calculate relevance score based on key financial and market indicators"""
-        indicators = ['billion', 'million', 'market size', 'growth rate', 'CAGR', 'forecast', 'revenue']
-        score = sum(1 for indicator in indicators if indicator.lower() in snippet.lower())
-        return score
-
-    def get_competitive_intelligence(self, brief):
-        """Deep competitive analysis using McKinsey's competitive intelligence framework"""
+    def _calculate_relevance(self, snippet, source_type, title=""):
+        """Enhanced relevance scoring with source type weighting"""
+        # High-value indicators
+        high_value_indicators = ['billion', 'trillion', 'market size', 'TAM', 'SAM', 'SOM', 'addressable market']
+        medium_value_indicators = ['million', 'growth rate', 'CAGR', 'forecast', 'projected', 'market share']
+        low_value_indicators = ['revenue', 'industry', 'analysis', 'report', 'research', 'study']
+        
+        # Calculate base score
+        base_score = 0
+        text_to_analyze = (snippet + " " + title).lower()
+        
+        for indicator in high_value_indicators:
+            if indicator.lower() in text_to_analyze:
+                base_score += 3
+        
+        for indicator in medium_value_indicators:
+            if indicator.lower() in text_to_analyze:
+                base_score += 2
+        
+        for indicator in low_value_indicators:
+            if indicator.lower() in text_to_analyze:
+                base_score += 1
+        
+        # Weight by source credibility
+        source_weights = {
+            'Gartner': 1.8, 'Forrester': 1.8, 'IDC': 1.6,
+            'McKinsey': 1.7, 'BCG': 1.7, 'Bain': 1.7,
+            'Deloitte': 1.5, 'PwC': 1.5, 'Accenture': 1.5,
+            'SEC Filings': 1.9, 'SEC Filings Analysis': 1.9,
+            'Frost & Sullivan': 1.4, 'Grand View Research': 1.3,
+            'Oliver Wyman': 1.4, 'Strategy&': 1.4, 'Roland Berger': 1.3,
+            'IQVIA': 1.6, 'Wood Mackenzie': 1.5, 'IHS Markit': 1.5,
+            'CB Insights': 1.4, 'Euromonitor': 1.3, 'Mintel': 1.3
+        }
+        
+        weight = source_weights.get(source_type, 1.0)
+        final_score = int(base_score * weight)
+        
+        # Bonus for recent content
+        if any(year in text_to_analyze for year in ['2024', '2025', '2023']):
+            final_score += 1
+        
+        return final_score
+    
+    def _extract_publication_indicators(self, snippet):
+        """Extract publication date and credibility indicators"""
+        indicators = {
+            'has_date': bool(re.search(r'\b(2024|2025|2023)\b', snippet)),
+            'has_numbers': bool(re.search(r'\$?\d+\.?\d*\s*(billion|million|trillion)', snippet, re.IGNORECASE)),
+            'has_forecast': bool(re.search(r'\b(forecast|projected|expected|estimated)\b', snippet, re.IGNORECASE)),
+            'has_growth': bool(re.search(r'\b(growth|CAGR|increase|expand)\b', snippet, re.IGNORECASE))
+        }
+        return indicators
+    
+    def _assess_data_quality(self, snippet, source_type):
+        """Assess the quality of data from the snippet"""
+        quality_score = 0
+        
+        # Check for quantitative data
+        if re.search(r'\$?\d+\.?\d*\s*(billion|million|trillion)', snippet, re.IGNORECASE):
+            quality_score += 2
+        
+        # Check for time-bound data
+        if re.search(r'\b(2024|2025|2023)\b', snippet):
+            quality_score += 1
+        
+        # Check for methodology indicators
+        if re.search(r'\b(survey|analysis|research|study|report)\b', snippet, re.IGNORECASE):
+            quality_score += 1
+        
+        # Source credibility bonus
+        if source_type in ['Gartner', 'Forrester', 'McKinsey', 'BCG', 'SEC Filings']:
+            quality_score += 2
+        
+        if quality_score >= 4:
+            return "High"
+        elif quality_score >= 2:
+            return "Medium"
+        else:
+            return "Low"
+    
+    def get_competitive_intelligence(self, brief, industry_data=None):
+        """Enhanced competitive analysis with industry focus"""
         competitive_data = []
         
-        # Identify key competitors
+        # Use industry-specific keywords for better targeting
+        industry_keywords = industry_data.get('industry_keywords', []) if industry_data else []
+        search_terms = ' '.join(industry_keywords) if industry_keywords else brief
+        
+        # Identify key competitors with industry context
         competitor_query = self.call_openai_agent(
-            f"Identify the top 10 direct and indirect competitors for: {brief}. "
-            f"Include established players, emerging threats, and potential disruptors. "
-            f"Categorize as: Direct Competitors, Indirect Competitors, Substitute Threats, New Entrants."
+            f"Identify the top 12 competitors for: {brief}. "
+            f"Industry context: {industry_data.get('primary_industry', 'general') if industry_data else 'general'}. "
+            f"Focus on: Direct Competitors, Indirect Competitors, Substitute Threats, New Entrants, Industry Disruptors. "
+            f"Include both established players and emerging companies."
         )
         
-        # Competitive landscape research
         try:
             if self.serpapi_key:
-                # Funding and investment research
-                funding_query = f"{brief} competitors funding investment Series A B C"
-                competitive_data.extend(self._search_data_source(funding_query, "Investment Analysis"))
+                # Enhanced competitive research queries
+                queries = [
+                    f"{search_terms} competitors funding investment Series A B C IPO",
+                    f"{search_terms} industry partnerships acquisitions M&A strategic alliances",
+                    f"{search_terms} technology innovation patents R&D investments",
+                    f"{search_terms} market share leaders competitive positioning",
+                    f"{search_terms} competitive analysis Porter five forces",
+                    f"{search_terms} industry consolidation market dynamics"
+                ]
                 
-                # Strategic moves and partnerships
-                strategy_query = f"{brief} industry partnerships acquisitions strategic alliances"
-                competitive_data.extend(self._search_data_source(strategy_query, "Strategic Intelligence"))
-                
-                # Technology and innovation tracking
-                tech_query = f"{brief} technology innovation patents R&D"
-                competitive_data.extend(self._search_data_source(tech_query, "Technology Intelligence"))
-                
-                # Market share analysis
-                share_query = f"{brief} market share leaders competitive position"
-                competitive_data.extend(self._search_data_source(share_query, "Market Share Analysis"))
+                for query in queries:
+                    competitive_data.extend(self._search_data_source(query, "Competitive Intelligence"))
                 
         except Exception as e:
             competitive_data.append({"error": f"Competitive intelligence failed: {str(e)}"})
             
         return competitive_data
-
-    def get_macro_trend_analysis(self, brief):
-        """Macro trend analysis using STEEP framework (Social, Technological, Economic, Environmental, Political)"""
+    
+    def get_macro_trend_analysis(self, brief, industry_data=None):
+        """Enhanced macro trend analysis with industry-specific focus"""
         trend_data = []
         
-        try:
-            if self.serpapi_key:
-                # Economic trends
-                economic_query = f"{brief} economic trends inflation interest rates consumer spending"
-                trend_data.extend(self._search_data_source(economic_query, "Economic Analysis"))
-                
-                # Technology trends
-                tech_query = f"{brief} technology trends AI automation digital transformation"
-                trend_data.extend(self._search_data_source(tech_query, "Technology Trends"))
-                
-                # Social and demographic trends
-                social_query = f"{brief} consumer behavior demographics generational trends"
-                trend_data.extend(self._search_data_source(social_query, "Social Trends"))
-                
-                # Regulatory and political trends
-                regulatory_query = f"{brief} regulatory changes government policy industry regulations"
-                trend_data.extend(self._search_data_source(regulatory_query, "Regulatory Trends"))
-                
-                # Environmental and sustainability trends
-                environmental_query = f"{brief} sustainability ESG environmental regulations"
-                trend_data.extend(self._search_data_source(environmental_query, "Sustainability Trends"))
-                
-        except Exception as e:
-            trend_data.append({"error": f"Trend analysis failed: {str(e)}"})
-            
-        return trend_data
-
-    def get_customer_segmentation_analysis(self, brief):
-        """Advanced customer segmentation and persona analysis"""
-        customer_data = []
+        industry_keywords = industry_data.get('industry_keywords', []) if industry_data else []
+        search_terms = ' '.join(industry_keywords) if industry_keywords else brief
         
         try:
             if self.serpapi_key:
-                # Customer demographics and psychographics
-                demo_query = f"{brief} target customers demographics psychographics buyer personas"
-                customer_data.extend(self._search_data_source(demo_query, "Customer Demographics"))
-                
-                # Customer journey and behavior
-                journey_query = f"{brief} customer journey buying process decision factors"
-                customer_data.extend(self._search_data_source(journey_query, "Customer Journey"))
-                
-                # Market research and surveys
-                research_query = f"{brief} consumer research survey customer satisfaction"
-                customer_data.extend(self._search_data_source(research_query, "Consumer Research"))
-                
-        except Exception as e:
-            customer_data.append({"error": f"Customer analysis failed: {str(e)}"})
-            
-        return customer_data
-
-    def generate_porter_five_forces_analysis(self, brief, research_data):
-        """Generate Porter's Five Forces analysis"""
-        porter_prompt = f"""
-        Based on the business brief: "{brief}"
-        And comprehensive market research: {json.dumps(research_data, indent=2)}
-        
-        Conduct a detailed Porter's Five Forces analysis:
-        
-        1. **THREAT OF NEW ENTRANTS**
-        - Barriers to entry (capital requirements, economies of scale, regulations)
-        - Brand loyalty and switching costs
-        - Access to distribution channels
-        - Government policies and regulations
-        
-        2. **BARGAINING POWER OF SUPPLIERS**
-        - Supplier concentration
-        - Switching costs
-        - Availability of substitutes
-        - Forward integration threats
-        
-        3. **BARGAINING POWER OF BUYERS**
-        - Buyer concentration
-        - Price sensitivity
-        - Product differentiation
-        - Backward integration potential
-        
-        4. **THREAT OF SUBSTITUTE PRODUCTS**
-        - Availability of substitutes
-        - Switching costs
-        - Buyer propensity to substitute
-        - Price-performance trade-offs
-        
-        5. **COMPETITIVE RIVALRY**
-        - Industry growth rate
-        - Fixed costs and capacity
-        - Product differentiation
-        - Exit barriers
-        
-        Provide specific examples and quantitative data where available.
-        Rate each force as: LOW, MODERATE, HIGH and explain the strategic implications.
-        """
-        
-        return self.call_openai_agent(porter_prompt, temperature=0.2)
-
-    def generate_bcg_matrix_analysis(self, brief, research_data):
-        """Generate BCG Growth-Share Matrix analysis"""
-        bcg_prompt = f"""
-        Based on: "{brief}" and market research: {json.dumps(research_data, indent=2)}
-        
-        Create a BCG Matrix analysis for potential product/service portfolio:
-        
-        **STARS (High Growth, High Market Share)**
-        - High-growth opportunities with competitive advantage
-        - Investment requirements and potential returns
-        
-        **CASH COWS (Low Growth, High Market Share)**
-        - Stable revenue generators
-        - Resource allocation strategies
-        
-        **QUESTION MARKS (High Growth, Low Market Share)**
-        - High-risk, high-reward opportunities
-        - Investment decisions and growth strategies
-        
-        **DOGS (Low Growth, Low Market Share)**
-        - Potential divestiture candidates
-        - Turnaround strategies or exit planning
-        
-        Include specific recommendations for resource allocation and strategic priorities.
-        """
-        
-        return self.call_openai_agent(bcg_prompt, temperature=0.2)
-
-    def generate_financial_projections(self, brief, research_data):
-        """Generate sophisticated financial projections and business model analysis"""
-        financial_prompt = f"""
-        As a senior partner at McKinsey, create comprehensive financial projections for: "{brief}"
-        
-        Based on market research: {json.dumps(research_data, indent=2)}
-        
-        ## FINANCIAL PROJECTIONS (5-Year)
-        
-        ### Revenue Model Analysis
-        - Primary revenue streams
-        - Pricing strategy analysis
-        - Revenue growth assumptions
-        - Seasonality and cyclicality factors
-        
-        ### Market Sizing and Penetration
-        - TAM (Total Addressable Market): $X billion
-        - SAM (Serviceable Addressable Market): $X billion  
-        - SOM (Serviceable Obtainable Market): $X billion
-        - Market penetration timeline and assumptions
-        
-        ### Unit Economics
-        - Customer Acquisition Cost (CAC)
-        - Customer Lifetime Value (CLV)
-        - Gross margin analysis
-        - Contribution margin by segment
-        
-        ### Operating Leverage Analysis
-        - Fixed vs. variable cost structure
-        - Scalability factors
-        - Break-even analysis
-        - Sensitivity analysis
-        
-        ### Investment Requirements
-        - Initial capital requirements
-        - Working capital needs
-        - Technology and infrastructure investments
-        - Human capital requirements
-        
-        ### Financial Ratios and Benchmarks
-        - Industry benchmark comparisons
-        - Key performance indicators
-        - Profitability metrics
-        - Return on investment calculations
-        
-        Provide specific numbers and assumptions where possible based on industry data.
-        """
-        
-        return self.call_openai_agent(financial_prompt, temperature=0.2)
-
-    def generate_go_to_market_strategy(self, brief, research_data):
-        """Generate comprehensive go-to-market strategy"""
-        gtm_prompt = f"""
-        Develop a world-class go-to-market strategy for: "{brief}"
-        
-        Based on research: {json.dumps(research_data, indent=2)}
-        
-        ## GO-TO-MARKET STRATEGY
-        
-        ### 1. MARKET ENTRY STRATEGY
-        - Beachhead market selection
-        - Expansion sequence planning
-        - Geographic rollout strategy
-        - Timing and sequencing
-        
-        ### 2. CUSTOMER ACQUISITION STRATEGY
-        - Primary acquisition channels
-        - Channel partner strategy
-        - Sales methodology
-        - Marketing mix optimization
-        
-        ### 3. PRICING STRATEGY
-        - Pricing model selection
-        - Competitive pricing analysis
-        - Value-based pricing framework
-        - Dynamic pricing opportunities
-        
-        ### 4. DISTRIBUTION STRATEGY
-        - Channel strategy (direct vs. indirect)
-        - Partnership opportunities
-        - Digital distribution channels
-        - International expansion planning
-        
-        ### 5. MARKETING STRATEGY
-        - Brand positioning
-        - Marketing channels and tactics
-        - Content marketing strategy
-        - Public relations and thought leadership
-        
-        ### 6. OPERATIONAL REQUIREMENTS
-        - Technology infrastructure
-        - Team structure and hiring plan
-        - Operational processes
-        - Quality assurance and customer success
-        
-        ### 7. METRICS AND KPIs
-        - Leading indicators
-        - Lagging indicators
-        - Growth metrics
-        - Operational efficiency metrics
-        
-        Include specific timelines, budgets, and success metrics for each component.
-        """
-        
-        return self.call_openai_agent(gtm_prompt, temperature=0.2)
-
-    def marketing_agent(self, brief):
-        """Main marketing analysis function delivering McKinsey-level insights"""
-        
-        print("🔍 Conducting comprehensive market research...")
-        
-        # Gather comprehensive market intelligence
-        market_data = self.get_tam_sam_som_analysis(brief)
-        competitive_intelligence = self.get_competitive_intelligence(brief)
-        macro_trends = self.get_macro_trend_analysis(brief)
-        customer_analysis = self.get_customer_segmentation_analysis(brief)
-        
-        # Compile all research data
-        research_data = {
-            "market_sizing": market_data,
-            "competitive_intelligence": competitive_intelligence,
-            "macro_trends": macro_trends,
-            "customer_analysis": customer_analysis,
-            "analysis_date": datetime.now().isoformat()
-        }
-        
-        print("📊 Generating strategic frameworks...")
-        
-        # Generate strategic analyses
-        porter_analysis = self.generate_porter_five_forces_analysis(brief, research_data)
-        bcg_analysis = self.generate_bcg_matrix_analysis(brief, research_data)
-        financial_projections = self.generate_financial_projections(brief, research_data)
-        gtm_strategy = self.generate_go_to_market_strategy(brief, research_data)
-        
-        # Generate executive summary
-        executive_summary_prompt = f"""
-        As a senior partner at McKinsey & Company, create a comprehensive strategic analysis for: "{brief}"
-        
-        Structure this as a world-class consulting deliverable:
-        
-        ## EXECUTIVE SUMMARY
-        
-        ### Strategic Recommendation
-        ### Key Success Factors
-        ### Critical Risk Factors
-        ### Investment Thesis
-        ### Expected ROI and Timeline
-        
-        ## MARKET OPPORTUNITY ASSESSMENT
-        
-        ### Market Sizing Analysis
-        - TAM/SAM/SOM breakdown with specific numbers
-        - Growth rate projections
-        - Market maturity assessment
-        
-        ### Competitive Landscape
-        - Key players and market positioning
-        - Competitive advantages and gaps
-        - Threat assessment
-        
-        ## STRATEGIC ANALYSIS
-        
-        ### Porter's Five Forces
-        {porter_analysis}
-        
-        ### BCG Matrix Analysis
-        {bcg_analysis}
-        
-        ## FINANCIAL PROJECTIONS
-        {financial_projections}
-        
-        ## GO-TO-MARKET STRATEGY
-        {gtm_strategy}
-        
-        ## MACRO TREND ANALYSIS
-        - Economic factors and implications
-        - Technology disruption opportunities
-        - Regulatory and policy impacts
-        - Social and demographic trends
-        
-        ## CUSTOMER SEGMENTATION & TARGETING
-        - Primary customer segments
-        - Customer personas and journey mapping
-        - Value proposition for each segment
-        - Customer acquisition and retention strategies
-        
-        ## RISK ASSESSMENT & MITIGATION
-        - Market risks and dependencies
-        - Competitive threats and responses
-        - Operational risks and contingencies
-        - Financial risks and hedging strategies
-        
-        ## STRATEGIC RECOMMENDATIONS
-        - Phase 1: Launch Strategy (0-12 months)
-        - Phase 2: Growth Strategy (12-36 months)
-        - Phase 3: Scale Strategy (36+ months)
-        - Key performance indicators and milestones
-        - Resource allocation and investment priorities
-        
-        Format as a consulting-grade deliverable with specific metrics, timelines, and actionable recommendations.
-        Include confidence levels for key assumptions and sensitivity analyses.
-        """
-        
-        final_analysis = self.call_openai_agent(executive_summary_prompt, temperature=0.1)
-        
-        # Add comprehensive data sources section
-        citations = "\n\n## DATA SOURCES & METHODOLOGY\n\n"
-        citations += "### Research Methodology\n"
-        citations += "- Multi-source data triangulation\n"
-        citations += "- Industry expert insights synthesis\n"
-        citations += "- Competitive intelligence gathering\n"
-        citations += "- Macro trend analysis\n"
-        citations += "- Financial modeling and projections\n\n"
-        
-        # Add source citations
-        for source_type, sources in research_data.items():
-            if source_type != "analysis_date" and sources:
-                citations += f"### {source_type.replace('_', ' ').title()}:\n"
-                # Sort by relevance score if available
-                sorted_sources = sorted(sources, 
-                                      key=lambda x: x.get('relevance_score', 0), 
-                                      reverse=True)
-                for source in sorted_sources[:8]:  # Top 8 most relevant per category
-                    if isinstance(source, dict) and "error" not in source:
-                        citations += f"- **{source.get('source', 'Unknown')}**: {source.get('title', 'Unnamed Report')}\n"
-                        if source.get('url'):
-                            citations += f"  🔗 {source['url']}\n"
-                        if source.get('snippet'):
-                            citations += f"  📝 {source['snippet'][:150]}...\n"
-                        if source.get('relevance_score'):
-                            citations += f"  📊 Relevance Score: {source['relevance_score']}/7\n"
-                        citations += "\n"
-        
-        # Add analysis metadata
-        citations += f"\n### Analysis Metadata\n"
-        citations += f"- Analysis Date: {research_data['analysis_date']}\n"
-        citations += f"- Total Sources Analyzed: {sum(len(sources) for sources in research_data.values() if isinstance(sources, list))}\n"
-        citations += f"- Confidence Level: High (based on multiple source validation)\n"
-        citations += f"- Refresh Recommendation: Monthly for competitive intelligence, Quarterly for market sizing\n"
-        
-        return final_analysis + citations
-
-# Usage function for the main application
-def marketing_agent(brief):
-    """Main function to be called from main.py"""
-    agent = MarketingAgent()
-    return agent.marketing_agent(brief)
+                # Industry-specific trend queries
+                trend_queries = [
+                    f"{search
