@@ -1,267 +1,362 @@
 import streamlit as st
-from legal_agent import legal_agent
-from marketing_agent import marketing_agent
+import asyncio
+import threading
 import time
-import json
 from datetime import datetime
+from queue import Queue
+import json
 
-st.set_page_config(
-    page_title="Legal and Marketing Assistance",
-    page_icon="🎯",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Custom CSS for professional styling
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #1f2937;
-        text-align: center;
-        margin-bottom: 0.5rem;
-    }
-    .sub-header {
-        font-size: 1.1rem;
-        color: #6b7280;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .agent-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.5rem;
-        border-radius: 0.75rem;
-        color: white;
-        margin: 1rem 0;
-    }
-    .legal-card {
-        # background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    }
-    .marketing-card {
-        # background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    }
-    .feature-list {
-        font-size: 0.9rem;
-        margin-top: 1rem;
-    }
-    .stProgress .st-bo {
-        background-color: #e5e7eb;
-    }
-    .analysis-section {
-        background-color: #f8fafc;
-        padding: 1.5rem;
-        border-radius: 0.5rem;
-        margin: 1rem 0;
-        border-left: 4px solid #3b82f6;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-def typewriter_output(text, delay=0.01):
-    """Enhanced typewriter effect with progress indication"""
-    container = st.empty()
-    progress_bar = st.progress(0)
-    full_output = ""
-    
-    for i, char in enumerate(text):
-        full_output += char
-        container.markdown(full_output, unsafe_allow_html=True)
-        progress_bar.progress((i + 1) / len(text))
-        time.sleep(delay)
-    
-    progress_bar.empty()
-    return full_output
-
-def display_analysis_results(output, agent_type):
-    """Display results with professional formatting"""
-    st.markdown("---")
-    st.markdown(f"<div class='analysis-section'>", unsafe_allow_html=True)
-    
-    if agent_type == "Legal & Compliance":
-        st.markdown("### Legal & Compliance Analysis")
-        st.markdown("*Comprehensive legal risk assessment and compliance roadmap*")
-    else:
-        st.markdown("### Strategic Market Analysis")
-        st.markdown("*Provide expert-level market intelligence and strategic recommendations*")
-    
-    # Add analysis timestamp
-    st.markdown(f"**Analysis Date:** {datetime.now().strftime('%B %d, %Y at %I:%M %p')}")
-    
-    # Display the output with typewriter effect
-    with st.expander("Full Analysis Report", expanded=True):
-        typewriter_output(output, delay=0.003)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-
-def main():
-    # Header
-    st.markdown('<h1 class="main-header"> Legal and Marketing Assistance </h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">World-class legal and marketing intelligence powered by AI</p>', unsafe_allow_html=True)
-    
-    # Sidebar configuration
-    with st.sidebar:
-        st.header("Configuration")
+# Enhanced streaming UI components
+class StreamingAnalysisUI:
+    def __init__(self):
+        self.progress_queue = Queue()
+        self.results_queue = Queue()
+        self.analysis_complete = False
         
-        # Agent selection
+    def create_real_time_progress(self):
+        """Create real-time progress display"""
+        progress_container = st.empty()
+        status_container = st.empty()
+        results_container = st.empty()
+        
+        return progress_container, status_container, results_container
+    
+    def update_progress(self, message, progress_value):
+        """Update progress callback"""
+        self.progress_queue.put({"message": message, "progress": progress_value})
+    
+    def display_streaming_results(self, brief, agent_type):
+        """Display results with real-time streaming"""
+        
+        # Create containers for dynamic updates
+        progress_container, status_container, results_container = self.create_real_time_progress()
+        
+        # Initialize progress
+        progress_bar = progress_container.progress(0)
+        status_text = status_container.empty()
+        
+        # Start analysis in background thread
+        analysis_thread = threading.Thread(
+            target=self.run_analysis_thread,
+            args=(brief, agent_type)
+        )
+        analysis_thread.start()
+        
+        # Real-time progress updates
+        partial_results = ""
+        while not self.analysis_complete:
+            try:
+                # Check for progress updates
+                if not self.progress_queue.empty():
+                    progress_data = self.progress_queue.get_nowait()
+                    status_text.text(progress_data["message"])
+                    progress_bar.progress(progress_data["progress"])
+                
+                # Check for partial results
+                if not self.results_queue.empty():
+                    result_data = self.results_queue.get_nowait()
+                    partial_results += result_data
+                    
+                    # Display partial results as they come in
+                    with results_container.container():
+                        st.markdown("### Analysis in Progress...")
+                        st.markdown(partial_results)
+                        st.markdown("---")
+                        st.markdown("*Analysis continuing...*")
+                
+                time.sleep(0.1)  # Small delay to prevent overwhelming the UI
+                
+            except Exception as e:
+                st.error(f"Error in streaming: {str(e)}")
+                break
+        
+        # Wait for thread to complete
+        analysis_thread.join()
+        
+        # Clear progress indicators
+        progress_container.empty()
+        status_container.empty()
+        
+        # Display final results
+        if hasattr(self, 'final_result'):
+            self.display_final_results(self.final_result, agent_type, results_container)
+    
+    def run_analysis_thread(self, brief, agent_type):
+        """Run analysis in background thread"""
+        try:
+            if agent_type == "Legal & Compliance":
+                from legal_agent import legal_agent_optimized
+                result = legal_agent_optimized(brief)
+            else:
+                from marketing_agent import marketing_agent
+                result = marketing_agent(brief)
+            
+            self.final_result = result
+            self.analysis_complete = True
+            
+        except Exception as e:
+            self.final_result = f"Analysis failed: {str(e)}"
+            self.analysis_complete = True
+    
+    def display_final_results(self, output, agent_type, container):
+        """Display final results with enhanced formatting"""
+        with container.container():
+            st.markdown("---")
+            st.markdown("## ✅ Analysis Complete")
+            
+            if agent_type == "Legal & Compliance":
+                st.markdown("### 🏛️ Legal & Compliance Analysis")
+                st.markdown("*Comprehensive legal risk assessment and compliance roadmap*")
+            else:
+                st.markdown("### 📊 Strategic Market Analysis")
+                st.markdown("*Expert-level market intelligence and strategic recommendations*")
+            
+            # Add analysis timestamp
+            st.markdown(f"**Analysis Date:** {datetime.now().strftime('%B %d, %Y at %I:%M %p')}")
+            
+            # Split output into sections for better readability
+            sections = self.parse_analysis_sections(output)
+            
+            for section_title, section_content in sections.items():
+                with st.expander(section_title, expanded=True):
+                    st.markdown(section_content)
+            
+            # Add download button
+            st.download_button(
+                label="📥 Download Analysis Report",
+                data=output,
+                file_name=f"{agent_type.lower().replace(' & ', '_').replace(' ', '_')}_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
+                mime="text/markdown",
+                use_container_width=True
+            )
+    
+    def parse_analysis_sections(self, output):
+        """Parse analysis output into logical sections"""
+        sections = {}
+        
+        # Split by common headers
+        lines = output.split('\n')
+        current_section = "Executive Summary"
+        current_content = []
+        
+        for line in lines:
+            if line.startswith('##') or line.startswith('###'):
+                # Save previous section
+                if current_content:
+                    sections[current_section] = '\n'.join(current_content)
+                
+                # Start new section
+                current_section = line.strip('#').strip()
+                current_content = []
+            else:
+                current_content.append(line)
+        
+        # Add final section
+        if current_content:
+            sections[current_section] = '\n'.join(current_content)
+        
+        return sections
+
+# Enhanced main function with streaming
+def main_with_streaming():
+    st.set_page_config(
+        page_title="Legal and Marketing Assistance - Optimized",
+        page_icon="🚀",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    # Custom CSS for better performance indicators
+    st.markdown("""
+    <style>
+        .streaming-header {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1f2937;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        .performance-badge {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-block;
+            margin: 0.5rem;
+        }
+        .quick-analysis {
+            background: #000000;
+            border: 1px solid #0ea5e9;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        .streaming-indicator {
+            background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+            text-align: center;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Header with performance indicators
+    st.markdown('<h1 class="streaming-header">🚀 Legal & Marketing Assistance - Optimized</h1>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    # Sidebar with optimized settings
+    with st.sidebar:
+        st.header("⚙️ Optimized Settings")
+        
         agent_type = st.selectbox(
             "Select Advisory Service",
-            ["Legal & Compliance", "Strategic Marketing & Analysis"],
-            help="Choose the type of analysis you need"
+            ["Legal & Compliance", "Strategic Marketing & Analysis"]
         )
         
-        # Analysis depth
-        analysis_depth = st.selectbox(
-            "Analysis Depth",
-            ["Standard", "Deep Dive", "Executive Summary"],
-            index=1,
-            help="Select the depth of analysis required"
+        # Analysis speed settings
+        st.markdown("### 🚀 Performance Settings")
+        
+        analysis_speed = st.selectbox(
+            "Analysis Speed",
+            ["Ultra Fast (1-2 min)", "Balanced (2-3 min)", "Comprehensive (3-5 min)"],
+            index=0,
+            help="Ultra Fast: Core insights only, Balanced: Key analysis, Comprehensive: Full research"
         )
         
-        # Output format
-        output_format = st.selectbox(
-            "Output Format",
-            ["Detailed Report", "Executive Summary"],
-            # Action Items can be later added
-            help="Choose how you want the results formatted"
+        streaming_enabled = st.checkbox(
+            "Enable Real-time Streaming",
+            value=True,
+            help="Show results as they're generated"
+        )
+        
+        concurrent_research = st.checkbox(
+            "Parallel Research",
+            value=True,
+            help="Run multiple research queries simultaneously"
         )
         
         st.markdown("---")
-        st.markdown("### Information Sources")
-        st.markdown("Legal Case Databases")
-        st.markdown("Regulatory Intelligence")
-        st.markdown("Market Research Platforms")
-        st.markdown("Competitive Intelligence")
-        st.markdown("Financial Analysis Tools")
-        st.markdown("Industry Expert Insights")
-    
-    # Main content area
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        if agent_type == "Legal & Compliance":
-            st.markdown("""
-            <div class="agent-card legal-card">
-                <h3> Legal & Compliance Advisory</h3>
-                <p>Comprehensive legal risk assessment and compliance strategy development</p>
-                <div class="feature-list">
-                    <strong>Key Features:</strong><br>
-                    • Multi-jurisdictional legal research<br>
-                    • Regulatory compliance mapping<br>
-                    • Risk assessment matrix<br>
-                    • Compliance roadmap development<br>
-                    • International legal considerations<br>
-                    • Executive-ready recommendations
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div class="agent-card marketing-card">
-                <h3>Strategic Marketing & Analysis</h3>
-                <p> Provide expert-level market intelligence and strategic business analysis</p>
-                <div class="feature-list">
-                    <strong>Key Features:</strong><br>
-                    • TAM/SAM/SOM market sizing<br>
-                    • Competitive intelligence analysis<br>
-                    • Porter's Five Forces framework<br>
-                    • Financial projections & modeling<br>
-                    • Go-to-market strategy<br>
-                    • Strategic recommendations
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    with col2:
-        # Input section
-        st.markdown("### Business Brief")
-        brief = st.text_area(
-            "Describe your business idea, product, or service:",
-            height=200,
-            placeholder="Enter a detailed description of your business concept, target market, key features, and any specific questions you have...",
-            help="The more detailed your brief, the more comprehensive and actionable the analysis will be."
+        st.markdown("### 📊 Analysis Scope")
+        
+        max_sources = st.slider(
+            "Max Sources per Category",
+            min_value=2,
+            max_value=10,
+            value=3,
+            help="Fewer sources = faster analysis"
         )
         
-        # Additional context
-        with st.expander(" Additional Context (Optional)"):
-            industry = st.text_input("Industry/Sector", placeholder="e.g., FinTech, Healthcare, E-commerce")
-            geography = st.text_input("Target Geography", placeholder="e.g., United States, European Union, Global")
-            stage = st.selectbox("Business Stage", ["Concept", "Pre-Launch", "Launch", "Growth", "Scale"])
-            funding = st.text_input("Funding Status", placeholder="e.g., Bootstrapped, Seed, Series A")
+        depth_level = st.selectbox(
+            "Analysis Depth",
+            ["Essential", "Standard", "Detailed"],
+            index=0
+        )
     
-    # Analysis button
-    if st.button("Generate Strategic Analysis", type="primary", use_container_width=True):
+    # Main content area
+    st.markdown("### 📝 Business Brief")
+    
+    # Enhanced input with templates
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        brief = st.text_area(
+            "Describe your business:",
+            height=150,
+            placeholder="Enter your business description...",
+            help="Be specific about your business model, target market, and key concerns"
+        )
+    
+    with col2:
+        st.markdown("### 🎯 Quick Templates")
+        
+        templates = {
+            "SaaS Startup": "B2B SaaS platform for small businesses providing...",
+            "E-commerce": "Online marketplace connecting buyers and sellers of...",
+            "FinTech": "Financial technology solution that enables...",
+            "Healthcare": "Healthcare technology platform that helps...",
+            "Custom": ""
+        }
+        
+        template_choice = st.selectbox("Use Template", list(templates.keys()))
+        
+        if template_choice != "Custom" and st.button("Use Template"):
+            brief = templates[template_choice]
+            st.rerun()
+    
+    # Quick analysis section
+    # if brief:
+    #     st.markdown("""
+    #     <div class="quick-analysis">
+    #         <h4>🔍 Quick Analysis Preview</h4>
+    #         <p>Based on your brief, we'll analyze:</p>
+    #         <ul>
+    #             <li><strong>Regulatory Requirements:</strong> Key compliance areas</li>
+    #             <li><strong>Legal Risks:</strong> Primary liability concerns</li>
+    #             <li><strong>Market Opportunities:</strong> Growth potential</li>
+    #             <li><strong>Competitive Landscape:</strong> Key players and positioning</li>
+    #         </ul>
+    #     </div>
+    #     """, unsafe_allow_html=True)
+    
+    # Analysis execution
+    if st.button("Start Analysis", type="primary", use_container_width=True):
         if brief:
-            # Prepare enhanced brief with context
-            enhanced_brief = f"""
-            Business Brief: {brief}
+            streaming_ui = StreamingAnalysisUI()
             
-            Additional Context:
-            - Industry: {industry if industry else 'Not specified'}
-            - Geography: {geography if geography else 'Not specified'}
-            - Stage: {stage}
-            - Funding: {funding if funding else 'Not specified'}
-            - Analysis Depth: {analysis_depth}
-            - Output Format: {output_format}
-            """
-            
-            # Display analysis progress
-            with st.spinner("🔍 Conducting comprehensive analysis..."):
-                progress_text = st.empty()
-                progress_bar = st.progress(0)
+            if streaming_enabled:
+                st.markdown("""
+                <div class="streaming-indicator">
+                    <h4> Analysis in Progres s</h4>
+                    <p>Results will appear below as they're generated...</p>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                # Simulate analysis stages
-                stages = [
-                    "Initializing research modules...",
-                    "Gathering market intelligence...",
-                    "Analyzing competitive landscape...",
-                    "Processing regulatory data...",
-                    "Generating strategic frameworks...",
-                    "Compiling executive summary...",
-                    "Finalizing recommendations..."
-                ]
-                
-                for i, stage in enumerate(stages):
-                    progress_text.text(stage)
-                    progress_bar.progress((i + 1) / len(stages))
-                    time.sleep(43)
-                
-                # Run the appropriate agent
-                try:
-                    if agent_type == "Legal & Compliance":
-                        output = legal_agent(enhanced_brief)
-                    else:
-                        output = marketing_agent(enhanced_brief)
+                # Run streaming analysis
+                streaming_ui.display_streaming_results(brief, agent_type)
+            else:
+                # Traditional analysis with progress bar
+                with st.spinner("Analyzing..."):
+                    progress_bar = st.progress(0)
                     
-                    progress_text.empty()
-                    progress_bar.empty()
+                    def progress_callback(message, progress):
+                        progress_bar.progress(progress)
+                        st.write(f"Status: {message}")
+                    
+                    if agent_type == "Legal & Compliance":
+                        from legal_agent import legal_agent_optimized
+                        result = legal_agent_optimized(brief)
+                    else:
+                        from marketing_agent import marketing_agent
+                        result = marketing_agent(brief)
+                    
+                    progress_bar.progress(1.0)
+                    st.success("Analysis complete!")
                     
                     # Display results
-                    display_analysis_results(output, agent_type)
-                    
-                    # Add download option
-                    st.download_button(
-                        label=" Download Analysis Report",
-                        data=output,
-                        file_name=f"{agent_type.lower().replace(' & ', '_').replace(' ', '_')}_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
-                        mime="text/markdown",
-                        use_container_width=True
-                    )
-                    
-                except Exception as e:
-                    st.error(f"Analysis failed: {str(e)}")
-                    st.info("Please check your API keys and network connection.")
+                    streaming_ui.display_final_results(result, agent_type, st.empty())
         else:
-            st.warning("Please enter a business brief to proceed with the analysis.")
+            st.warning("Please enter a business brief to proceed.")
     
-    # Footer
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; color: #6b7280; font-size: 0.9rem;">
-        <p> Legal and Marketing Assistance | Powered by Advanced AI Research & Analysis</p>
-        <p>For best results, ensure your business brief is detailed and specific.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Performance tips
+    # with st.expander("🚀 Performance Tips"):
+    #     st.markdown("""
+    #     **For fastest results:**
+    #     - Use "Ultra Fast" mode for core insights
+    #     - Enable parallel research
+    #     - Limit sources to 2-3 per category
+    #     - Use specific, focused business briefs
+        
+    #     **For comprehensive analysis:**
+    #     - Use "Comprehensive" mode
+    #     - Increase max sources to 5-8
+    #     - Provide detailed business context
+    #     - Allow 3-5 minutes for complete analysis
+    #     """)
 
 if __name__ == "__main__":
-    main()
+    main_with_streaming()
