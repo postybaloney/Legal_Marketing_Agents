@@ -1,3 +1,6 @@
+import asyncio
+import aiohttp
+import concurrent.futures
 from openai import OpenAI
 import requests
 import os
@@ -6,7 +9,9 @@ import json
 from datetime import datetime
 import time
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
+from queue import Queue
+import threading
 
 load_dotenv()
 
@@ -15,6 +20,8 @@ class MarketingAgent:
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.serpapi_key = os.getenv("SERPAPI_KEY")
         self.data_sources = []
+        self.results_queue = Queue()
+        self.session = None
         
         # Industry-specific consultancy mapping
         self.industry_consultancies = {
@@ -80,15 +87,29 @@ class MarketingAgent:
             "Celent": "celent.com",
             "Rabobank": "rabobank.com"
         }
+
+    async def create_session(self):
+        """Create async session for concurrent API calls"""
+        if not self.session:
+            timeout = aiohttp.ClientTimeout(total=20)
+            self.session = aiohttp.ClientSession(timeout=timeout)
+        return self.session
+    
+    async def close_session(self):
+        """Close async session"""
+        if self.session:
+            await self.session.close()
+            self.session = None
         
-    def call_openai_agent(self, prompt, temperature=0.2, model="gpt-4o"):
-        """Enhanced OpenAI call optimized for strategic analysis"""
+    def call_openai_agent(self, prompt, temperature=0.2, model="gpt-4o-mini"):
+        """Optimized OpenAI API call with timeout"""
         try:
             response = self.client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
-                max_tokens=4000
+                max_tokens=2000,  # Reduced for faster response
+                timeout=15  # 15 second timeout
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -156,6 +177,78 @@ class MarketingAgent:
         
         return list(consultancies)
     
+    async def async_market_research(self, brief, industry_data, max_results=3):
+            """Async market research with reduced scope"""
+            market_data = []
+            
+            try:
+                consultancies = self.get_industry_specific_consultancies(industry_data)
+                search_terms = ' '.join(industry_data.get('industry_keywords', []))
+                
+                session = await self.create_session()
+                
+                # Create 3 targeted queries instead of multiple per consultancy
+                queries = [
+                    f"{search_terms} market size TAM billion 2024 2025",
+                    f"{search_terms} industry analysis growth forecast",
+                    f"{search_terms} competitive landscape market share"
+                ]
+                
+                # Run queries concurrently
+                tasks = []
+                for query in queries:
+                    tasks.append(self.fetch_market_data(session, query))
+                
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                for result in results:
+                    if isinstance(result, list):
+                        market_data.extend(result[:2])  # Top 2 per query
+                        
+            except Exception as e:
+                market_data.append({"error": f"Market research failed: {str(e)}"})
+                
+            return market_data
+    
+    async def fetch_market_data(self, session, query):
+        """Fetch market data asynchronously"""
+        try:
+            url = "https://serpapi.com/search"
+            params = {
+                "engine": "google",
+                "q": query,
+                "api_key": self.serpapi_key,
+                "num": 3,  # Reduced from 6
+                "gl": "us",
+                "hl": "en"
+            }
+            
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    results = []
+                    
+                    for item in data.get("organic_results", []):
+                        snippet = item.get('snippet', '')
+                        title = item.get('title', 'Market Report')
+                        relevance_score = self._calculate_relevance_optimized(snippet, title)
+                        
+                        if relevance_score > 3:
+                            results.append({
+                                "source": "Market Research",
+                                "title": title,
+                                "url": item.get('link', ''),
+                                "snippet": snippet,
+                                "relevance_score": relevance_score
+                            })
+                    
+                    return results
+                    
+        except Exception as e:
+            return [{"error": f"Market data fetch failed: {str(e)}"}]
+        
+        return []
+
     def get_relevant_public_companies(self, brief, industry_data):
         """Identify relevant public companies for SEC filing analysis"""
         company_prompt = f"""
