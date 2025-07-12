@@ -2,3 +2,6 @@
 /.env
 .venv/
 __pycache__/
+books/
+test_file.py
+marketing2.py

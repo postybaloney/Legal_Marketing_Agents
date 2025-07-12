@@ -3,3 +3,6 @@ openai
 requests
 python-dotenv
 aiohttp
+PyPDF2
+pdfplumber
+PyMuPDF
