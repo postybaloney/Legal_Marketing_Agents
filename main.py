@@ -89,12 +89,13 @@ class StreamingAnalysisUI:
                 result = legal_agent_optimized(brief)
             else:
                 from marketing2 import get_agent
-                from marketing_agent import marketing_agent
+                # from marketing_agent import marketing_agent
                 agent = get_agent()
                 if agent is None:
                     raise ValueError("Marketing agent not initialized")
                     result = marketing_agent(brief)
                 else:
+                    agent = agent.set_knowledge_base(agent)
                     result = agent.get_consultation(brief)
             
             self.final_result = result

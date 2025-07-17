@@ -395,6 +395,7 @@ class MarketingAgent:
         
         if not self.knowledge_base:
             return "No marketing books have been processed yet. Please add PDF books to the books folder."
+        print(agent.knowledge_base)
         
         # Compile knowledge base summary
         knowledge_summary = self._compile_knowledge_summary()
@@ -576,3 +577,10 @@ def get_agent():
         openai_api_key=str(os.getenv("OPENAI_API_KEY")),
         books_folder="Legal_Marketing_Agents/books"
     )
+def set_knowledge_base(agent):
+    with open("E:/Moccet/marketing_knowledge_cache.pkl", 'r') as f:
+        knowledge = pickle.load(f)
+        print(knowledge)
+        agent.knowledge_base = knowledge
+    agent.knowledge_base = knowledge
+    return agent
