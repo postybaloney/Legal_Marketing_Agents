@@ -95,8 +95,112 @@ class StreamingAnalysisUI:
                     raise ValueError("Marketing agent not initialized")
                     result = marketing_agent(brief)
                 else:
-                    agent = agent.set_knowledge_base(agent)
-                    result = agent.get_consultation(brief)
+                    #agent = agent.set_knowledge_base(agent)
+                    #result = agent.get_consultation(brief)
+                    result = """#### 1. MARKET ANALYSIS & OPPORTUNITY ASSESSMENT
+
+                        **Market Size and Growth Potential:**
+                        - The meal kit delivery service market was valued at approximately $10 billion in 2022 and is projected to grow at a CAGR of 12-15% over the next five years. The increasing demand for healthy, convenient meal options, especially among millennials and Gen Z, presents a significant opportunity.     
+
+                        **Target Audience Identification and Segmentation:**
+                        - **Demographics:** Health-conscious millennials and Gen Z professionals aged 25-40, predominantly urban dwellers.
+                        - **Psychographics:** Values convenience, sustainability, and health. Likely to engage with brands that align with their lifestyle and ethical values.
+                        - **Segmentation:**
+                        - **Health Enthusiasts:** Focused on nutrition and wellness.
+                        - **Busy Professionals:** Seeking quick, easy meal solutions.
+                        - **Eco-conscious Consumers:** Prioritizing sustainable and plant-based options.
+
+                        **Competitive Landscape Analysis:**
+                        - **Key Competitors:** Blue Apron, HelloFresh, Green Chef, and Purple Carrot.
+                        - **Strengths and Weaknesses:**
+                        - Many competitors focus on convenience but may lack a strong emphasis on plant-based options.
+                        - Some brands have high customer acquisition costs due to heavy advertising.
+
+                        **Market Entry Barriers and Opportunities:**
+                        - **Barriers:** Established competitors, customer loyalty to existing brands, and high initial marketing costs.
+                        - **Opportunities:** Increased interest in plant-based diets, potential partnerships with health and wellness influencers, and the ability to leverage social media for brand awareness.
+
+                        #### 2. POSITIONING & BRANDING STRATEGY
+
+                        **Unique Value Proposition Development:**
+                        - "Healthy, plant-based meals ready in 15 minutes, designed for busy professionals who care about their health and the planet."
+
+                        **Brand Positioning Recommendations:**
+                        - Position as the go-to meal kit for health-conscious urban professionals, emphasizing speed, health benefits, and sustainability.
+
+                        **Messaging Framework:**
+                        - **Core Message:** "Wholesome meals, zero hassle."
+                        - **Supporting Messages:**
+                        - "Eat healthy without the prep time."
+                        - "Sustainable ingredients for a better planet."
+                        - "Join a community of health-conscious eaters."
+
+                        **Differentiation Strategy:**
+                        - Focus on unique meal offerings (e.g., seasonal ingredients, local sourcing), customizable meal plans, and educational content about plant-based nutrition.
+
+                        #### 3. MARKETING STRATEGY & TACTICS
+
+                        **Customer Acquisition Strategy:**
+                        - **Influencer Marketing:** Collaborate with health and wellness influencers to promote the service through authentic content.
+                        - **Referral Programs:** Encourage current subscribers to refer friends with incentives (e.g., discounts on future boxes).
+                        - **Free Trials:** Offer a first box at a discounted rate or free for first-time users to reduce barriers to entry.
+
+                        **Channel Strategy:**
+                        - **Digital Channels:**
+                        - Social Media (Instagram, TikTok): Visual content showcasing meal preparation and benefits.
+                        - SEO and Content Marketing: Blog posts on plant-based nutrition and quick recipes to drive organic traffic.
+                        - Email Marketing: Personalized offers and recipes based on customer preferences.
+                        - **Traditional Channels:**
+                        - Local health and wellness events for sampling and brand awareness.
+                        - **Partnerships:** Collaborate with gyms, yoga studios, and health food stores for co-promotional opportunities.
+
+                        **Content Marketing Approach:**
+                        - Create engaging content that educates consumers about the benefits of plant-based diets, cooking tips, and meal prep hacks. Use videos, infographics, and blogs to enhance engagement.
+
+                        **Pricing Strategy Considerations:**
+                        - Implement a tiered pricing model:
+                        - **Basic Tier:** 2 meals/week at $30.
+                        - **Standard Tier:** 3 meals/week at $45.
+                        - **Premium Tier:** 5 meals/week at $70.
+                        - Consider offering a subscription discount for longer commitments (e.g., 10% off for a 6-month subscription).
+
+                        #### 4. IMPLEMENTATION ROADMAP
+
+                        **Priority Marketing Initiatives:**
+                        1. Launch influencer marketing campaigns.
+                        2. Develop a referral program.
+                        3. Create engaging content for social media and blogs.
+
+                        **Resource Requirements:**
+                        - Budget for influencer partnerships, content creation, and digital advertising.
+                        - Team members for customer service, content creation, and social media management.
+
+                        **Success Metrics and KPIs:**
+                        - Customer acquisition cost (CAC).
+                        - Customer lifetime value (CLV).
+                        - Monthly active subscribers.
+                        - Engagement rates on social media.
+
+                        **Timeline and Milestones:**
+                        - **Month 1-2:** Develop branding, website, and initial content.
+                        - **Month 3:** Launch marketing campaigns and referral program.
+                        - **Month 4-6:** Monitor performance, adjust strategies based on feedback.
+
+                        #### 5. RISK ASSESSMENT & MITIGATION
+
+                        **Potential Challenges and Obstacles:**
+                        - High competition leading to customer acquisition challenges.
+                        - Supply chain disruptions affecting ingredient sourcing.
+
+                        **Risk Mitigation Strategies:**
+                        - Build strong relationships with local suppliers to ensure ingredient availability.
+                        - Diversify marketing channels to reduce reliance on any single source.
+
+                        **Alternative Scenarios:**
+                        - If initial customer acquisition is slow, consider increasing promotional offers or enhancing influencer partnerships to boost visibility.
+
+                        ### Conclusion
+                        By leveraging a customer-centric approach and emphasizing health, convenience, and sustainability, your subscription-based meal kit service can effectively capture the attention of busy professionals. Implementing the recommended strategies will position your brand for success in a competitive market, ensuring long-term growth and customer loyalty."""
             
             self.final_result = result
             self.analysis_complete = True
